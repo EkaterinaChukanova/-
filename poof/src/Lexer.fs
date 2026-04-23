@@ -294,7 +294,7 @@ let rec nextToken (s: LexerState) : Token =
         advance s
         match current s with 
         | Some '=' -> advance s; GTE
-        | _ -> GTE
+        | _ -> GT
     
     | Some '&' ->
         advance s
