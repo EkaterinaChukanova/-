@@ -16,6 +16,7 @@ module Poof.Tests
 open Poof.AST
 open Poof.Lexer
 open Poof.Parser
+open Poof.Enviroment
 
 
 // ============================================================
@@ -597,6 +598,275 @@ spell compute a b c ->
         | Bind("compute", Lambda("a", Lambda("b", Lambda("c", If(_, _, _)))), Unit) -> true
         | _ -> false)
 
+// ============================================================
+//  ТЕСТЫ ENVIRONMENT
+// ============================================================
+
+let runEnvironmentTests () =
+    printfn ""
+    printfn "--- Тесты Environment ---"
+
+    // ----------------------------------------------------------
+    //  Базовые операции с окружением
+    // ----------------------------------------------------------
+    test "пустое окружение — переменная не найдена" (fun () ->
+        lookupValue "x" emptyEnv = None)
+
+    test "bindValue + lookupValue" (fun () ->
+        let env = emptyEnv |> bindValue "x" (VInt 42)
+        lookupValue "x" env = Some (VInt 42))
+
+    test "два значения в одном слое" (fun () ->
+        let env = emptyEnv
+                  |> bindValue "x" (VInt 1)
+                  |> bindValue "y" (VInt 2)
+        lookupValue "x" env = Some (VInt 1) &&
+        lookupValue "y" env = Some (VInt 2))
+
+    test "новый слой перекрывает старый" (fun () ->
+        let env1 = emptyEnv |> bindValue "x" (VInt 1)
+        let env2 = extendEnv env1 |> bindValue "x" (VInt 99)
+        lookupValue "x" env2 = Some (VInt 99))
+
+    test "поиск уходит в родительский слой" (fun () ->
+        let parent = emptyEnv |> bindValue "x" (VInt 42)
+        let child  = extendEnv parent
+        lookupValue "x" child = Some (VInt 42))
+
+    test "lookupOrFail — нашёл" (fun () ->
+        let env = emptyEnv |> bindValue "n" (VInt 5)
+        lookupOrFail "n" env = VInt 5)
+
+    testFails "lookupOrFail — не нашёл, бросает ошибку" (fun () ->
+        lookupOrFail "ghost" emptyEnv |> ignore)
+
+    // ----------------------------------------------------------
+    //  Типы значений
+    // ----------------------------------------------------------
+    test "VInt сохраняется и читается" (fun () ->
+        let env = emptyEnv |> bindValue "n" (VInt 42)
+        lookupValue "n" env = Some (VInt 42))
+
+    test "VFloat сохраняется и читается" (fun () ->
+        let env = emptyEnv |> bindValue "f" (VFloat 3.14)
+        lookupValue "f" env = Some (VFloat 3.14))
+
+    test "VBool true" (fun () ->
+        let env = emptyEnv |> bindValue "b" (VBool true)
+        lookupValue "b" env = Some (VBool true))
+
+    test "VString сохраняется" (fun () ->
+        let env = emptyEnv |> bindValue "s" (VString "poof")
+        lookupValue "s" env = Some (VString "poof"))
+
+    test "VUnit сохраняется" (fun () ->
+        let env = emptyEnv |> bindValue "u" VUnit
+        lookupValue "u" env = Some VUnit)
+
+    test "VList сохраняется" (fun () ->
+        let lst = VList [VInt 1; VInt 2; VInt 3]
+        let env = emptyEnv |> bindValue "xs" lst
+        lookupValue "xs" env = Some lst)
+
+    // ----------------------------------------------------------
+    //  valueToString
+    // ----------------------------------------------------------
+    test "VInt → строка" (fun () ->
+        valueToString (VInt 42) = "42")
+
+    test "VFloat → строка" (fun () ->
+        valueToString (VFloat 3.14) = "3.14")
+
+    test "VBool true → строка" (fun () ->
+        valueToString (VBool true) = "true")
+
+    test "VBool false → строка" (fun () ->
+        valueToString (VBool false) = "false")
+
+    test "VString → строка без кавычек" (fun () ->
+        valueToString (VString "hello") = "hello")
+
+    test "VUnit → строка" (fun () ->
+        valueToString VUnit = "()")
+
+    test "VList → строка" (fun () ->
+        valueToString (VList [VInt 1; VInt 2; VInt 3]) = "[1, 2, 3]")
+
+    test "пустой VList → строка" (fun () ->
+        valueToString (VList []) = "[]")
+
+    test "VBuiltin → строка содержит имя ритуала" (fun () ->
+        let s = valueToString (VBuiltin("enchant", fun x -> x))
+        s.Contains("enchant"))
+
+    // ----------------------------------------------------------
+    //  require-функции
+    // ----------------------------------------------------------
+    test "requireInt успех" (fun () ->
+        requireInt (VInt 5) = 5)
+
+    testFails "requireInt провал на строке" (fun () ->
+        requireInt (VString "x") |> ignore)
+
+    test "requireBool успех" (fun () ->
+        requireBool (VBool true) = true)
+
+    testFails "requireBool провал на числе" (fun () ->
+        requireBool (VInt 1) |> ignore)
+
+    test "requireString успех" (fun () ->
+        requireString (VString "hi") = "hi")
+
+    testFails "requireString провал на числе" (fun () ->
+        requireString (VInt 0) |> ignore)
+
+    test "requireList успех" (fun () ->
+        requireList (VList [VInt 1]) = [VInt 1])
+
+    testFails "requireList провал на числе" (fun () ->
+        requireList (VInt 0) |> ignore)
+
+    test "requireFloat — int конвертируется в float" (fun () ->
+        requireFloat (VInt 3) = 3.0)
+
+    // ----------------------------------------------------------
+    //  Встроенные ритуалы глобального окружения
+    // ----------------------------------------------------------
+
+    // Проверка наличия ритуалов
+    test "глобальное окружение содержит peek" (fun () ->
+        lookupValue "peek" globalEnv <> None)
+
+    test "глобальное окружение содержит rest" (fun () ->
+        lookupValue "rest" globalEnv <> None)
+
+    test "глобальное окружение содержит not" (fun () ->
+        lookupValue "not" globalEnv <> None)
+
+    test "глобальное окружение содержит conjure" (fun () ->
+        lookupValue "conjure" globalEnv <> None)
+
+    test "глобальное окружение содержит count" (fun () ->
+        lookupValue "count" globalEnv <> None)
+
+    test "глобальное окружение содержит mirror" (fun () ->
+        lookupValue "mirror" globalEnv <> None)
+
+    test "глобальное окружение содержит purify" (fun () ->
+        lookupValue "purify" globalEnv <> None)
+
+    // not
+    test "not true = false" (fun () ->
+        match lookupOrFail "not" globalEnv with
+        | VBuiltin(_, fn) -> fn (VBool true) = VBool false
+        | _ -> false)
+
+    test "not false = true" (fun () ->
+        match lookupOrFail "not" globalEnv with
+        | VBuiltin(_, fn) -> fn (VBool false) = VBool true
+        | _ -> false)
+
+    // peek (head)
+    test "peek [1,2,3] = 1" (fun () ->
+        match lookupOrFail "peek" globalEnv with
+        | VBuiltin(_, fn) -> fn (VList [VInt 1; VInt 2; VInt 3]) = VInt 1
+        | _ -> false)
+
+    testFails "peek пустого списка — ошибка" (fun () ->
+        match lookupOrFail "peek" globalEnv with
+        | VBuiltin(_, fn) -> fn (VList []) |> ignore
+        | _ -> ())
+
+    // rest (tail)
+    test "rest [1,2,3] = [2,3]" (fun () ->
+        match lookupOrFail "rest" globalEnv with
+        | VBuiltin(_, fn) -> fn (VList [VInt 1; VInt 2; VInt 3]) = VList [VInt 2; VInt 3]
+        | _ -> false)
+
+    testFails "rest пустого списка — ошибка" (fun () ->
+        match lookupOrFail "rest" globalEnv with
+        | VBuiltin(_, fn) -> fn (VList []) |> ignore
+        | _ -> ())
+
+    // count (length)
+    test "count [1,2,3] = 3" (fun () ->
+        match lookupOrFail "count" globalEnv with
+        | VBuiltin(_, fn) -> fn (VList [VInt 1; VInt 2; VInt 3]) = VInt 3
+        | _ -> false)
+
+    test "count [] = 0" (fun () ->
+        match lookupOrFail "count" globalEnv with
+        | VBuiltin(_, fn) -> fn (VList []) = VInt 0
+        | _ -> false)
+
+    // isVoid (isEmpty)
+    test "isVoid [] = true" (fun () ->
+        match lookupOrFail "isVoid" globalEnv with
+        | VBuiltin(_, fn) -> fn (VList []) = VBool true
+        | _ -> false)
+
+    test "isVoid [1] = false" (fun () ->
+        match lookupOrFail "isVoid" globalEnv with
+        | VBuiltin(_, fn) -> fn (VList [VInt 1]) = VBool false
+        | _ -> false)
+
+    // mirror (reverse)
+    test "mirror [1,2,3] = [3,2,1]" (fun () ->
+        match lookupOrFail "mirror" globalEnv with
+        | VBuiltin(_, fn) ->
+            fn (VList [VInt 1; VInt 2; VInt 3]) = VList [VInt 3; VInt 2; VInt 1]
+        | _ -> false)
+
+    // purify (abs)
+    test "purify (-5) = 5" (fun () ->
+        match lookupOrFail "purify" globalEnv with
+        | VBuiltin(_, fn) -> fn (VInt -5) = VInt 5
+        | _ -> false)
+
+    test "purify 5 = 5" (fun () ->
+        match lookupOrFail "purify" globalEnv with
+        | VBuiltin(_, fn) -> fn (VInt 5) = VInt 5
+        | _ -> false)
+
+    // inscribe (toString)
+    test "inscribe 42 = \"42\"" (fun () ->
+        match lookupOrFail "inscribe" globalEnv with
+        | VBuiltin(_, fn) -> fn (VInt 42) = VString "42"
+        | _ -> false)
+
+    test "inscribe true = \"true\"" (fun () ->
+        match lookupOrFail "inscribe" globalEnv with
+        | VBuiltin(_, fn) -> fn (VBool true) = VString "true"
+        | _ -> false)
+
+    // transmute (toInt)
+    test "transmute float 3.9 = 3" (fun () ->
+        match lookupOrFail "transmute" globalEnv with
+        | VBuiltin(_, fn) -> fn (VFloat 3.9) = VInt 3
+        | _ -> false)
+
+    testFails "transmute строки не числа — ошибка" (fun () ->
+        match lookupOrFail "transmute" globalEnv with
+        | VBuiltin(_, fn) -> fn (VString "abc") |> ignore
+        | _ -> ())
+
+    // dissolve (toFloat)
+    test "dissolve int 3 = 3.0" (fun () ->
+        match lookupOrFail "dissolve" globalEnv with
+        | VBuiltin(_, fn) -> fn (VInt 3) = VFloat 3.0
+        | _ -> false)
+
+    // unroot (sqrt)
+    test "unroot 9 = 3.0" (fun () ->
+        match lookupOrFail "unroot" globalEnv with
+        | VBuiltin(_, fn) -> fn (VInt 9) = VFloat 3.0
+        | _ -> false)
+
+    // measure (strLength)
+    test "measure \"hello\" = 5" (fun () ->
+        match lookupOrFail "measure" globalEnv with
+        | VBuiltin(_, fn) -> fn (VString "hello") = VInt 5
+        | _ -> false)
 
 // ============================================================
 //  6. ТОЧКА ВХОДА
@@ -616,5 +886,6 @@ let runAllTests () =
     runParserTests ()
     runPatternTests ()
     runStressTests ()
+    runEnvironmentTests ()
 
     printSummary ()
