@@ -20,6 +20,9 @@ type Value =
     // Встроенный ритуал
     | VBuiltin of name: string * fn: (Value -> Value)
 
+    // Ссылочная ячейка для поддержки рекурсии и изменяемого состояния
+    | VRef of Value ref
+
     override this.Equals(obj) =
         match obj with
         | :? Value as other ->
@@ -32,6 +35,7 @@ type Value =
             | VList a, VList b -> a = b
             | VFunc(p1,_,_), VFunc(p2,_,_) -> p1 = p2
             | VBuiltin(n1,_), VBuiltin(n2,_) -> n1 = n2
+            | VRef r1, VRef r2 -> !r1 = !r2
             | _ -> false
         | _ -> false
     override this.GetHashCode() = 
@@ -44,6 +48,7 @@ type Value =
         | VList xs -> hash xs
         | VFunc(p,_,_) -> hash p
         | VBuiltin(n,_) -> hash n
+        | VRef r -> hash !r
 
 // Тип Env - окружение выполнения
 and Env =  {
@@ -63,11 +68,13 @@ let extendEnv (parent: Env) : Env =
 
 // Добавить привязку имя->значение в текущий слой окружения
 let bindValue (name: string) (value: Value) (env: Env) : Env = 
-    { env with Bindings = env.Bindings |> Map.add name value }
+    let refValue = VRef (ref value)
+    { env with Bindings = env.Bindings |> Map.add name refValue }
 
 // Найти значение по имени - ищет снизу вверх по цепочке
 let rec lookupValue (name: string) (env: Env) : Value option = 
     match env.Bindings |> Map.tryFind name with 
+    | Some (VRef r) -> Some !r
     | Some value -> Some value
     | None ->
         match env.Parent with
@@ -76,6 +83,7 @@ let rec lookupValue (name: string) (env: Env) : Value option =
 
 let lookupOrFail (name: string) (env: Env) : Value =
     match lookupValue name env with 
+    | Some (VRef r) -> !r
     | Some v -> v
     | None -> failwith $"The name '{name}' is unknown - no such spell has been bound in this realm"
 
@@ -91,6 +99,7 @@ let rec valueToString (value: Value) : string =
     | VBool false -> "false"
     | VString s -> s
     | VUnit -> "()"
+    | VRef r -> valueToString !r
     | VList items ->
         let inner = items |> List.map valueToString |> String.concat ", "
         $"[{inner}]"

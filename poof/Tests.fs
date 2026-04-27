@@ -17,6 +17,7 @@ open Poof.AST
 open Poof.Lexer
 open Poof.Parser
 open Poof.Enviroment
+open Poof.Interpreter
 
 
 // ============================================================
@@ -869,6 +870,92 @@ let runEnvironmentTests () =
         | _ -> false)
 
 // ============================================================
+//  ТЕСТЫ ИНТЕРПРЕТАТОРА
+// ============================================================
+
+let runInterpreterTests () =
+    printfn ""
+    printfn "--- Тесты Интерпретатора ---"
+
+    test "Интерпретатор: сложение Int" (fun () ->
+        run "1 + 2" = VInt 3)
+
+    test "Интерпретатор: сложение Float" (fun () ->
+        run "1.5 + 2.0" = VFloat 3.5)
+
+    test "Интерпретатор: конкатенация строк" (fun () ->
+        run "\"a\" ++ \"b\"" = VString "ab")
+
+    test "Интерпретатор: логика" (fun () ->
+        run "true && false" = VBool false &&
+        run "true || false" = VBool true)
+
+    test "Интерпретатор: сравнение" (fun () ->
+        run "3 < 5" = VBool true &&
+        run "5 == 5" = VBool true &&
+        run "5 != 6" = VBool true)
+
+    test "Интерпретатор: bind и использование" (fun () ->
+        run "bind x to 10\nx + 5" = VInt 15)
+
+    test "Интерпретатор: переопределение (shadowing)" (fun () ->
+        run "bind x to 1\nbind x to 2\nx" = VInt 2)
+
+    test "Интерпретатор: if (true branch)" (fun () ->
+        run "if true then 1 else 2" = VInt 1)
+
+    test "Интерпретатор: if (false branch)" (fun () ->
+        run "if false then 1 else 2" = VInt 2)
+
+    test "Интерпретатор: Вызов простой функции" (fun () ->
+        run "spell double n -> n * 2\ncast double with 5" = VInt 10)
+
+    test "Интерпретатор: Создание списка" (fun () ->
+        run "[1, 2, 3]" = VList [VInt 1; VInt 2; VInt 3])
+
+    test "Интерпретатор: peek (head)" (fun () ->
+        run "peek [10, 20, 30]" = VInt 10)
+
+    test "Интерпретатор: rest (tail)" (fun () ->
+        run "rest [10, 20, 30]" = VList [VInt 20; VInt 30])
+
+    test "Интерпретатор: count (length)" (fun () ->
+        run "count [1, 2, 3, 4]" = VInt 4)
+
+    test "Интерпретатор: mirror (reverse)" (fun () ->
+        run "mirror [1, 2, 3]" = VList [VInt 3; VInt 2; VInt 1])
+
+    test "Интерпретатор: enchant (map) double" (fun () ->
+        let code =
+            "spell double x -> x * 2\n" +
+            "bind d to cast double\n" +
+            "bind res to invoke enchant with d on [1, 2, 3]\n" +
+            "res"
+        run code = VList [VInt 2; VInt 4; VInt 6])
+
+    test "Интерпретатор: sieve (filter) even" (fun () ->
+        let code =
+            "spell isEven x -> x % 2 == 0\n" +
+            "bind p to cast isEven\n" +
+            "bind res to invoke sieve with p on [1, 2, 3, 4, 5]\n" +
+            "res"
+        run code = VList [VInt 2; VInt 4])
+
+    test "Интерпретатор: when (int match)" (fun () ->
+        run "bind x to 2\nwhen x\n 1 -> \"one\"\n 2 -> \"two\"\n _ -> \"other\"" = VString "two")
+
+    test "Интерпретатор: when (wildcard)" (fun () ->
+        run "bind x to 5\nwhen x\n 1 -> \"one\"\n _ -> \"other\"" = VString "other")
+
+    test "Интерпретатор: invoke (curried add)" (fun () ->
+        let code =
+            "spell add a b -> a + b\n" +
+            "bind a to cast add\n" +
+            "bind res to invoke a with 5 on 10\n" +
+            "res"
+        run code = VInt 15)
+
+// ============================================================
 //  6. ТОЧКА ВХОДА
 // ============================================================
 
@@ -887,5 +974,6 @@ let runAllTests () =
     runPatternTests ()
     runStressTests ()
     runEnvironmentTests ()
+    runInterpreterTests ()
 
     printSummary ()

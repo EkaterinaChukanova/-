@@ -30,17 +30,19 @@
 //     0
 
 open Poof.Tests
-open Poof.Parser
+open Poof.Interpreter
+open Poof.Enviroment
 
 [<EntryPoint>]
 let main argv =
     if argv |> Array.contains "--test" then
         let ok = runAllTests ()
-        printfn "%A" (Poof.Lexer.tokenize ">")
         if ok then 0 else 1   // код возврата 1 если тесты упали
     else
         // обычный запуск программы
         let code = System.Console.In.ReadToEnd()
-        debugParse code |> ignore
+        let result = run code
+        if result <> VUnit then
+            printfn "%s" (valueToString result)
         0
         

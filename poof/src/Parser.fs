@@ -166,10 +166,16 @@ and parseInvoke (s: ParserState) : Expr =
 
 and parseCast (s: ParserState) : Expr =
     expect s CAST
+    skipNewlines s
     let name = expectIdent s
-    expect s WITH
-    let arg = parseExpr s
-    Cast(name, arg)
+    skipNewlines s
+    // `cast f` возвращает значение функции; полная форма: `cast f with arg`
+    if tryConsume s WITH then
+        skipNewlines s
+        let arg = parseExpr s
+        Cast(name, arg)
+    else
+        Var name
 
 and parseOr (s: ParserState) : Expr =
     let mutable left = parseAnd s
