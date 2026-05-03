@@ -1,0 +1,21 @@
+~~ Числа Фибоначчи на Poof
+
+~~ Рекурсивная версия
+spell fib n ->
+  if n <= 1
+    then n
+    else (cast fib with n - 1) + (cast fib with n - 2)
+
+~~ Хвостовая рекурсия (быстрая)
+spell fibTail n ->
+  spell loop i a b ->
+    if i == 0
+      then a
+      else cast loop with i - 1 on b on (a + b)
+  cast loop with n on 0 on 1
+
+whisper "=== Fibonacci ==="
+whisper "fib(10) ="
+whisper (cast fib with 10)
+whisper "fibTail(10) ="
+whisper (cast fibTail with 10)

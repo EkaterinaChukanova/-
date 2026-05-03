@@ -1,0 +1,8 @@
+~~ Факториал на Poof
+spell fact n ->
+  if n == 0
+    then 1
+    else n * (cast fact with n - 1)
+
+whisper "Factorial of 5:"
+whisper (cast fact with 5)

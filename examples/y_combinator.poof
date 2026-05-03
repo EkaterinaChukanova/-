@@ -1,0 +1,16 @@
+~~ Y-комбинатор — доказывает Тьюринг-полноту
+
+spell y f ->
+  spell g x -> cast f with (x x)
+  cast g with g
+
+spell factGen self n ->
+  if n == 0
+    then 1
+    else n * (cast self with n - 1)
+
+bind fact to cast y with factGen
+
+whisper "=== Y-Combinator ==="
+whisper "fact(5) ="
+whisper (cast fact with 5)

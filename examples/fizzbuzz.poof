@@ -1,0 +1,22 @@
+~~ FizzBuzz на Poof
+
+spell fizzbuzz n ->
+  if n % 15 == 0
+    then "FizzBuzz"
+    else if n % 3 == 0
+      then "Fizz"
+      else if n % 5 == 0
+        then "Buzz"
+        else n
+
+spell printFizzBuzz max ->
+  spell loop i ->
+    if i <= max
+      then
+        whisper (cast fizzbuzz with i)
+        cast loop with i + 1
+    else ()
+  cast loop with 1
+
+whisper "=== FizzBuzz 1-20 ==="
+cast printFizzBuzz with 20

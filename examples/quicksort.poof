@@ -1,0 +1,28 @@
+~~ Быстрая сортировка на Poof
+
+spell filter pred xs ->
+  if isVoid xs
+    then []
+    else
+      bind head to peek xs
+      bind tail to rest xs
+      if cast pred with head
+        then conjure head (cast filter with pred on tail)
+        else cast filter with pred on tail
+
+spell quicksort xs ->
+  if isVoid xs
+    then []
+    else
+      bind pivot to peek xs
+      bind restList to rest xs
+      bind lesser to cast filter with (x -> x < pivot) on restList
+      bind greater to cast filter with (x -> x >= pivot) on restList
+      bind fold (cast append) [] (cast quicksort with greater)
+      ???
+
+~~ Простой пример
+whisper "=== QuickSort ==="
+bind nums to [5, 2, 8, 1, 9, 3]
+whisper "Before:"
+whisper nums

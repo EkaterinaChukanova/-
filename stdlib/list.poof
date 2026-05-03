@@ -1,0 +1,17 @@
+~~ list.poof — операции со списками
+
+spell fold f acc xs ->
+  if isVoid xs
+    then acc
+    else
+      bind head to peek xs
+      bind tail to rest xs
+      cast fold with f on (cast f with acc on head) on tail
+
+spell append xs ys ->
+  if isVoid xs
+    then ys
+    else
+      bind head to peek xs
+      bind tail to rest xs
+      conjure head (cast append with tail on ys)
