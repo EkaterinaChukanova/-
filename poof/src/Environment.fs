@@ -1,5 +1,7 @@
 module Poof.Enviroment
 open Poof.AST
+open System
+open System.Runtime.CompilerServices
 
 // Тип value - результат вычисления выражения
 [<CustomEquality; NoComparison>]
@@ -23,6 +25,8 @@ type Value =
     // Ссылочная ячейка для поддержки рекурсии и изменяемого состояния
     | VRef of Value ref
 
+    | VLazy of Lazy<Value>
+
     override this.Equals(obj) =
         match obj with
         | :? Value as other ->
@@ -36,6 +40,7 @@ type Value =
             | VFunc(p1,_,_), VFunc(p2,_,_) -> p1 = p2
             | VBuiltin(n1,_), VBuiltin(n2,_) -> n1 = n2
             | VRef r1, VRef r2 -> !r1 = !r2
+            | VLazy a, VLazy b -> Object.ReferenceEquals(a, b)
             | _ -> false
         | _ -> false
     override this.GetHashCode() = 
@@ -49,6 +54,7 @@ type Value =
         | VFunc(p,_,_) -> hash p
         | VBuiltin(n,_) -> hash n
         | VRef r -> hash !r
+        | VLazy l -> RuntimeHelpers.GetHashCode(l :> obj)
 
 // Тип Env - окружение выполнения
 and Env =  {
@@ -107,6 +113,8 @@ let rec valueToString (value: Value) : string =
         $"<spell ({param} -> ...)>"
     | VBuiltin(name, _) ->
         $"<ritual {name}>"
+    | VLazy _ ->
+        "<lazy>"
 
 let rec valueToDebugString (value: Value) : string = 
     match value with
@@ -350,3 +358,11 @@ let initGlobalEnv (applyFn: Value -> Value -> Value) : Env =
         VBuiltin("ritual$1", fun lst ->
             requireList lst |> List.iter (fun x -> applyFn f x |> ignore)
             VUnit)))
+
+    |> bindValue "delay" (VBuiltin("delay", fun f ->
+        VLazy (lazy (applyFn f VUnit))))
+
+    |> bindValue "force" (VBuiltin("force", fun v ->
+        match v with
+        | VLazy lz -> lz.Force()
+        | _ -> runtimeError "force expects a lazy value produced by delay"))

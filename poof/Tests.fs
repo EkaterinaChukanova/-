@@ -955,6 +955,25 @@ let runInterpreterTests () =
             "res"
         run code = VInt 15)
 
+    test "Интерпретатор: хвостовая рекурсия глубины 40000 не падает" (fun () ->
+        let code =
+            "spell count n ->\n" +
+            "  if n == 0\n" +
+            "    then 0\n" +
+            "    else cast count with (n - 1)\n" +
+            "cast count with 40000"
+        run code = VInt 0)
+
+    test "Интерпретатор: delay и force" (fun () ->
+        let code =
+            "spell thunk _ -> 40 + 2\n" +
+            "bind lz to delay (cast thunk)\n" +
+            "force lz"
+        run code = VInt 42)
+
+    testFails "Интерпретатор: force на не-lazy — ошибка" (fun () ->
+        run "force 1" |> ignore)
+
 // ============================================================
 //  6. ТОЧКА ВХОДА
 // ============================================================
